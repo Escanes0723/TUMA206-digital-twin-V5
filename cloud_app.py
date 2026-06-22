@@ -1,23 +1,4 @@
-"""Cloud Monitoring Dashboard — deploy this on Streamlit Cloud.
-
-Data flow:  local_backend.py  --MQTT-->  HiveMQ Cloud  --MQTT-->  this app
-           (your laptop)                (cloud broker)           (Streamlit Cloud)
-
-How to deploy (one-time setup):
-  1. Go to https://streamlit.io/cloud → New app
-  2. Select your GitHub repo, set Main file path = "cloud_app.py"
-  3. In Manage App → Settings → Secrets, add:
-       DASHBOARD_MODE = "remote"
-       MQTT_HOST = "3c57522d5f2e469d8ced051055a5bf1f.s1.eu.hivemq.cloud"
-       MQTT_PORT = "8883"
-       MQTT_TLS = "1"
-       MQTT_USERNAME = "tumademo"
-       MQTT_PASSWORD = "Tuma2026demo"
-       MQTT_TOPIC_PREFIX = "tuma206grp1bvg"
-  4. Save → Reboot app. Open the URL — live data appears when local_backend.py is running.
-
-Local testing:  DASHBOARD_MODE=remote streamlit run cloud_app.py
-"""
+"""Cloud Monitoring Dashboard — minimal bootstrap, no heavy imports at startup."""
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -45,4 +26,16 @@ except Exception:
 
 os.environ.setdefault("DASHBOARD_MODE", "remote")
 
-import dashboard.cloud  # noqa: F401 — self-rendering page
+# Show a simple loading page first so the user sees something immediately
+import streamlit as st
+st.set_page_config(page_title="Beverage Line Monitor", page_icon="⏣")
+st.title("Beverage Line Cloud Monitor")
+st.caption("Connecting to MQTT broker...")
+
+# Now try to load the dashboard
+try:
+    import dashboard.cloud  # noqa: F401
+except Exception as e:
+    st.error(f"Failed to load dashboard: {e}")
+    import traceback
+    st.code(traceback.format_exc())
