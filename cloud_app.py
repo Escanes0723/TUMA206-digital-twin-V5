@@ -20,7 +20,9 @@ for key in ["MQTT_HOST", "MQTT_PORT", "MQTT_TLS", "MQTT_USERNAME",
     except Exception:
         pass
 
-os.environ.setdefault("DASHBOARD_MODE", "remote")
+os.environ["DASHBOARD_MODE"] = "remote"
+# ── FORCE your unique topic — ignore secrets/config ──
+os.environ["MQTT_TOPIC_PREFIX"] = "tuma206grp1bvg_escanes0723"
 
 st.set_page_config(page_title="Cloud Monitor", page_icon="⏣")
 st.title("Beverage Line — Cloud Monitor")
