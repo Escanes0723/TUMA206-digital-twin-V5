@@ -36,17 +36,28 @@ import config
 bus = type(engine.bus).__name__
 st.caption(f"Bus: {bus} | Broker: {config.MQTT_HOST}:{config.MQTT_PORT} | Topic: {config.MQTT_TOPIC_TAGS}")
 
-latest = engine.latest()
+# Wait up to 15 seconds for the first MQTT message
+# (local_backend publishes every ~5 seconds)
+placeholder = st.empty()
+latest = None
+for i in range(15):
+    latest = engine.latest()
+    if latest:
+        break
+    placeholder.info(f"Waiting for data from local_backend.py... ({i+1}s)")
+    time.sleep(1)
 
 if not latest:
-    st.error("No data received. Is local_backend.py running on your computer?")
-    st.markdown("""
+    placeholder.error("No data received after 15s. Is local_backend.py running on your computer?")
+    st.markdown(f"""
     **Check:**
     1. Run `python local_backend.py` on your machine
     2. Make sure it prints "[OK] Connected via MqttBus"
-    3. Wait 5 seconds, then refresh this page
+    3. Broker: `{config.MQTT_HOST}:{config.MQTT_PORT}`
+    4. Topic: `{config.MQTT_TOPIC_TAGS}`
     """)
 else:
+    placeholder.empty()
     alarm_code = int(latest.get("alarm_code", 0))
     plc = latest.get("plc_state", "?")
     temp = float(latest.get("pasteur_temp", 0))
@@ -70,5 +81,6 @@ else:
     c7.metric("Bottles", bottles)
     c8.metric("Tick", tick)
 
-    if st.button("Refresh"):
-        st.rerun()
+    st.caption(f"Auto-refreshes every 5s | Tick: {tick}")
+    time.sleep(5)
+    st.rerun()
