@@ -1,83 +1,138 @@
 # Smart Beverage Pasteurization & Bottling Line — Digital Twin
 
-**TUMA206 Group 1**
+**TUMA206 Group 1** · Deployed by **Escanes0723**
 
-A complete industrial digital twin of a beverage pasteurization and bottling line, built as a pure-Python implementation of the Purdue enterprise reference architecture across five ISA-95 layers: physical process simulation → PLC control → MQTT data transport → operator dashboard → AI-assisted diagnostics. Every module has explicit input/output pins, a single responsibility, and a documented port specification.
+A complete industrial digital twin of a beverage pasteurization and bottling line, built as a pure-Python implementation of the Purdue enterprise reference architecture across five ISA-95 layers: physical process simulation → PLC control → MQTT data transport → operator dashboard → AI-assisted diagnostics.
 
 ---
 
-## Deployment & Demo Guide
+## Quick Start
 
-### Quick Launch (Windows — double-click `START_ALL.bat`)
+### Prerequisites
 
-| File | Effect |
-|------|--------|
-| **`START_ALL.bat`** | One-click: opens 3 windows — local backend + local dashboard (:8501) + browser → cloud dashboard |
-| `launchers/1_start_local.bat` | Local backend only (engine publishes to MQTT) |
-| `launchers/2_start_dashboard.bat` | Local dashboard → `http://localhost:8501` (SCHEMATIC/TRENDS/ALARMS) |
-| `launchers/3_start_cloud.bat` | Opens cloud dashboard URL in your browser |
+- Python 3.12+
+- Git (optional)
 
-### Two Dashboards — What They Are
-
-| Dashboard | URL | Engine | Controls | MQTT |
-|-----------|-----|--------|----------|------|
-| **Local** | `http://localhost:8501` | Runs its own simulation in-process | Full: START/STOP, faults, manual override | Only when `DASHBOARD_MODE=remote` |
-| **Cloud Monitor** | [tuma206mdi-beverage-line-cloud-dashboard.streamlit.app](https://tuma206mdi-beverage-line-cloud-dashboard.streamlit.app/) | None — reads MQTT from your local backend | None — pure display | **Always** (reads from HiveMQ Cloud) |
-| **Full Demo** | [tuma206mdi-beverage-digital-system.streamlit.app](https://tuma206mdi-beverage-digital-system.streamlit.app/) | Self-contained in-process engine | Full (public demo — not linked to your local data) | No |
-
-> **Important:** The **Cloud Monitor** shows data ONLY when a local backend is running and publishing to the SAME MQTT broker. It does not run its own simulation. The **Full Demo** URL is a standalone showcase that runs its own engine — it does NOT connect to your local backend or upload data to the cloud monitor.
-
-### How the Cloud Monitor Works
-
-```
-Your PC                                   HiveMQ Cloud              Streamlit Cloud
-┌──────────────────┐                    ┌────────────┐            ┌──────────────────┐
-│ local_backend.py │  ──publish──>      │ MQTT       │  ──sub──> │ cloud_app.py     │
-│ (engine + MQTT)  │                    │ Broker     │            │ (read-only KPI)  │
-└──────────────────┘                    └────────────┘            └──────────────────┘
-```
-
-1. Your `.env` file has MQTT credentials (already configured)
-2. `local_backend.py` publishes every tick to the broker
-3. The cloud dashboard (deployed on Streamlit Cloud) subscribes to the same broker
-4. **Any machine** running `local_backend.py` with the same credentials will show up on the cloud dashboard
-5. If you close `local_backend.py`, the cloud dashboard shows "No data" — reopen it, data resumes
-
-**One-time setup for the cloud dashboard** (already done — Streamlit Secrets configured with):
-```
-MQTT_HOST = 3c57522d5f2e469d8ced051055a5bf1f.s1.eu.hivemq.cloud
-MQTT_PORT = 8883
-MQTT_TLS = 1
-MQTT_USERNAME = tumademo
-MQTT_PASSWORD = Tuma2026demo
-MQTT_TOPIC_PREFIX = tuma206grp1bvg
-```
-
-### Telegram Alarm Notifications (Optional)
-
-The local backend pushes a Telegram message when any alarm fires — runs on the **local machine** (where the engine lives), in a background thread that never blocks the control loop.
-
-**Setup:**
-1. Message **@BotFather** on Telegram → `/newbot` → copy the bot token
-2. Add the bot to your group, then open `https://api.telegram.org/bot<TOKEN>/getUpdates` → copy the chat ID
-3. Add to `.env`:
-```bash
-TELEGRAM_BOT_TOKEN=123456789:AA...
-TELEGRAM_CHAT_ID=-1001234567890
-```
-
-When set, `local_backend.py` prints `Telegram alarms: on` and sends a "backend online" message at startup. On every new alarm, the bot posts `[ALARM] <code> — <description> | Pasteur: <temp>°C | Tank: <level>%`. If the variables are missing, it stays silently off.
-
-### Local Installation
+### 1. Clone & Install
 
 ```bash
-git clone <repo-url> && cd <project-dir>
-python -m venv .venv && .venv\Scripts\activate   # Windows
+git clone https://github.com/Escanes0723/TUMA206-digital-twin-V5.git
+cd TUMA206-digital-twin-V5
+python -m venv .venv
+.venv\Scripts\activate    # Windows
 pip install -r requirements.txt
-streamlit run dashboard/app.py                     # → http://localhost:8501
 ```
 
-### Smoke Test
+### 2. Launch
+
+**Option A — One-click (Windows)**
+
+Double-click `START_ALL.bat` — opens local backend + dashboard + browser.
+
+**Option B — Manual**
+
+```bash
+# Terminal 1: Start the simulation engine
+python local_backend.py
+
+# Terminal 2: Start the local dashboard (in remote mode to share data with cloud)
+set DASHBOARD_MODE=remote
+streamlit run dashboard/app.py --server.port 8505
+```
+
+Then open **http://localhost:8505** in your browser.
+
+---
+
+## Architecture
+
+```
+你的电脑 (Local)                         Streamlit Cloud (Cloud)
+┌─────────────────────────┐            ┌──────────────────────────┐
+│ local_backend.py        │   MQTT     │ cloud_app.py             │
+│ (唯一模拟引擎 + PLC)    │ ────────→  │ (只读显示，深色主题UI)    │
+│                         │  HiveMQ   │                          │
+│ localhost:8505          │  Cloud    │ tuma206-digital-twin-v5  │
+│ (remote模式，读MQTT)    │           │ .streamlit.app           │
+└─────────────────────────┘            └──────────────────────────┘
+```
+
+| 组件 | 地址 | 说明 |
+|------|------|------|
+| **Local Dashboard** | `http://localhost:8505` | 全功能控制面板，remote 模式读 MQTT |
+| **Cloud Monitor** | `https://tuma206-digital-twin-v5-twhnsbpxc5hnue2iubzra4.streamlit.app/` | 只读深色主题仪表盘 |
+| **Simulation Engine** | `local_backend.py` | 唯一数据源，发布到 MQTT |
+
+### MQTT Topic
+
+| | Shared (旧) | Unique (新) |
+|---|---|---|
+| Prefix | `tuma206grp1bvg` | `tuma206grp1bvg_escanes0723` |
+| Tags topic | `tuma206grp1bvg/tags` | `tuma206grp1bvg_escanes0723/tags` |
+| Data | 全班共享，tick 乱跳 | 专属，数据干净 |
+
+> If you deploy your own fork, change `MQTT_TOPIC_PREFIX` to a unique value in `.env` and `cloud_app.py` to avoid data collision.
+
+### Data Flow
+
+```
+local_backend.py (引擎)
+   │  tick=1,2,3...
+   │  每 5 秒发布一次 MQTT 消息
+   │
+   └──→ tuma206grp1bvg_escanes0723/tags (HiveMQ Cloud)
+          │
+          ├──→ localhost:8505 (remote 模式，显示实时数据)
+          │
+          └──→ Streamlit Cloud App (深色主题，KPI卡片+趋势图+报警)
+```
+
+### Why two dashboards show the SAME tick
+
+Both `localhost:8505` and the cloud dashboard read from **the same MQTT data stream** published by `local_backend.py`. There is only ONE simulation engine. If you want a self-contained local dashboard (separate engine), run without `DASHBOARD_MODE=remote`:
+
+```
+streamlit run dashboard/app.py --server.port 8501
+```
+
+But then localhost and cloud will show different ticks (different engines).
+
+---
+
+## Cloud Deployment
+
+### How to deploy your own cloud dashboard
+
+1. **Fork this repo** to your GitHub account
+2. Go to [share.streamlit.io](https://share.streamlit.io) → New app
+3. Select your repo, set Main file path = `cloud_app.py`
+4. In Settings → Secrets, add:
+
+```toml
+DASHBOARD_MODE = "remote"
+MQTT_HOST = "3c57522d5f2e469d8ced051055a5bf1f.s1.eu.hivemq.cloud"
+MQTT_PORT = "8883"
+MQTT_TLS = "1"
+MQTT_USERNAME = "tumademo"
+MQTT_PASSWORD = "Tuma2026demo"
+MQTT_TOPIC_PREFIX = "tuma206grp1bvg_YOUR_UNIQUE_SUFFIX"
+```
+
+5. Change `MQTT_TOPIC_PREFIX` in `cloud_app.py` line 10 to match
+6. Save → Reboot → your cloud URL is live
+
+### Common issues
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Cloud black screen | `st.set_page_config` not first, or engine init blocking | Already fixed — lazy engine init |
+| Tick jumping wildly | Multiple backends on same MQTT topic | Use unique `MQTT_TOPIC_PREFIX` |
+| Cloud shows "No data" | `local_backend.py` not running | Start it: `python local_backend.py` |
+| Cloud URL requires login | App visibility = Private | Settings → Sharing → Public |
+
+---
+
+## Smoke Test
 
 ```bash
 python scripts/run.py --ticks 30
@@ -163,7 +218,7 @@ module M1_PlantSimulator (
 
 ### M2 — PLC Controller (`plc/controller.py`)
 
-Scan-cycle PLC emulation. State machine, PI/P loops, 8-alarm fault detection every tick. Safety interlocks are **never bypassed**.
+Scan-cycle PLC emulation. State machine, PI/P loops, 8-alarm fault detection every tick.
 
 ```
 module M2_PLCController (
@@ -206,21 +261,21 @@ Two dashboard types sharing the same codebase via `dashboard/shared.py`:
 
 | Dashboard | Entry Point | Engine | Control |
 |-----------|------------|--------|---------|
-| **Local** | `dashboard/app.py` → `:8501` | `SimulationEngine` (in-process or MQTT) | Full: START/STOP, faults, manual override |
+| **Local** | `dashboard/app.py` → `:8505` | `SimulationEngine` (in-process or MQTT) | Full: START/STOP, faults, manual override |
 | **Cloud** | `cloud_app.py` → Streamlit Cloud | `RemoteEngineProxy` (MQTT only) | None — read-only monitor |
 
 | Page | Content |
 |------|---------|
 | **SCHEMATIC** | SVG industrial P&ID (7 animated equipment nodes), stage cards (S1–S5), KPI summary, manual override, fault injection, START/STOP/HARD RESET |
-| **TRENDS** | 2×2 sensor charts (Pasteur Temp + safe band, Tank Level, Flow Rate, Bottles) + actuator charts (Heater, Cooler dual-axis). FREEZE/UNFREEZE per chart. IDLE filtered. |
-| **ALARMS** | Auto-diagnosis panel, Force Analysis (alarm or health check), AI consultation chat with 4 quick-action buttons, free-form input outside auto-refresh fragment, alarm log, API key hot-swap |
+| **TRENDS** | 2×2 sensor charts (Pasteur Temp + safe band, Tank Level, Flow Rate, Bottles) + actuator charts (Heater, Cooler dual-axis). FREEZE/UNFREEZE per chart. |
+| **ALARMS** | Auto-diagnosis panel, Force Analysis, AI consultation chat, alarm log, API key hot-swap |
 
 ### M5 — AI Assistant (`ai_assistant/assistant.py`)
 
 Dual-provider LLM support with rule-based fallback:
 
 - **OpenAI / Anthropic** — auto-detected by API key prefix (`sk-proj-…` or `sk-ant-…`). Sends live tags + alarm + trend history. Returns concise operator-facing diagnosis. **Never commands actuators.**
-- **Rule-based fallback** — analyses live sensor data for all 8 alarm types. Produces structured response: state summary, alarm advice, out-of-range warnings.
+- **Rule-based fallback** — analyses live sensor data for all 8 alarm types. Produces structured response.
 
 ---
 
@@ -244,23 +299,23 @@ Dual-provider LLM support with rule-based fallback:
 
 ### S1 — Tank Level Feed-Forward Cascade
 
-Two actuators, one variable. The pump is master (sets rate), the inlet is slave (matches consumption). FF = `pump% × (4.0/6.0) × 100` + P-trim `±3.0×level_error`. Result: stable at 55.0% ±2%, no oscillation.
+Two actuators, one variable. FF = `pump% × (4.0/6.0) × 100` + P-trim `±3.0×level_error`. Result: stable at 55.0% ±2%.
 
 ### S2 — Pasteurizer PI with Adaptive Gain
 
-Flow-adaptive gain compensates variable cooling load: >35 L/min→5.0, 20–35→3.0, 8–20→2.0, <8→1.5. True anti-windup blocks integration only when saturated AND error pushes deeper.
+Flow-adaptive gain: >35 L/min→5.0, 20–35→3.0, 8–20→2.0, <8→1.5. True anti-windup.
 
 ### S3 — Cooler PI with Pipe Transit
 
-Product cools passively in inter-stage pipe (~40% ΔT shed). HX inlet at 50–55°C. PI (gain 2.5) drives glycol valve. Manual authority: 0%→53°C, 10%→40°C alarm, AUTO~43%→25°C, 80%→22°C.
+Product cools passively in inter-stage pipe (~40% ΔT shed). HX inlet at 50–55°C. PI (gain 2.5) drives glycol valve.
 
 ### S4 — Filler Interlock + Flow-Driven Timing
 
-Hard interlocks: product must be pasteurized (≥68°C) AND cooled (≤28°C). INDEX gap dynamic: `max(1, min(3, 8.0/flow))` ticks. Fill progress = `flow×dt / 2000mL`.
+Hard interlocks: product must be pasteurized (≥68°C) AND cooled (≤28°C). INDEX gap dynamic: `max(1, min(3, 8.0/flow))` ticks.
 
 ### S5 — Conveyor Buffer P-Controller
 
-Autonomous: `cmd = clamp(40 + 6×(buffer−12), 20, 100)`. Buffer grows → belt speeds up. Self-regulating.
+Autonomous: `cmd = clamp(40 + 6×(buffer−12), 20, 100)`.
 
 ---
 
@@ -270,11 +325,9 @@ Three phases prevent cold product from reaching the filler:
 
 | Phase | PLC | Inlet | Heater | Pump | Filler | Conveyor | Transition |
 |-------|-----|-------|--------|------|--------|----------|------------|
-| **HEAT** (0) | STARTING | AUTO (fill tank) | **100%** | OFF | OFF | OFF | temp≥68°C, cooler≤28°C, tank≥30% |
-| **PRIME** (1) | STARTING | AUTO (FF+P) | AUTO (PI) | 0→40% ramp | OFF | OFF | flow>5 L/min for 3 consecutive ticks |
-| **RUNNING** (2) | RUNNING | AUTO (FF+P) | AUTO (PI) | AUTO (P) | AUTO | AUTO (P-ctrl) | — |
-
-Tank alarms suppressed during HEAT. Manual override bypasses sequencer only for that actuator.
+| **HEAT** (0) | STARTING | AUTO | **100%** | OFF | OFF | OFF | temp≥68°C, cooler≤28°C, tank≥30% |
+| **PRIME** (1) | STARTING | AUTO | AUTO | 0→40% ramp | OFF | OFF | flow>5 L/min for 3 consecutive ticks |
+| **RUNNING** (2) | RUNNING | AUTO | AUTO | AUTO | AUTO | AUTO (P-ctrl) | — |
 
 ---
 
@@ -286,8 +339,6 @@ Tank alarms suppressed during HEAT. Manual override bypasses sequencer only for 
 2. **Flow-through cooling** — `temp −= 0.012 × flow_factor × (temp − 25°C)`
 3. **Noise** — ±0.04°C
 
-Steady state: ~84% heater → 72°C at normal flow.
-
 ### Cooler
 
 1. **Pipe transit** — `pipe_temp = 72°C − 0.50×(1−0.3×flow)×(72−25°C)` → inlet ~53°C
@@ -297,7 +348,6 @@ Steady state: ~84% heater → 72°C at normal flow.
 | Valve | Temp | State |
 |-------|------|-------|
 | 0% | ~53°C | No cooling |
-| 10% | ~40°C | COOLER_HIGH alarm |
 | 43% (AUTO) | **25°C** | PI setpoint |
 | 80–100% | ~22°C | Maximum cooling |
 
@@ -305,25 +355,23 @@ Steady state: ~84% heater → 72°C at normal flow.
 
 ## Fault Injection & Alarm System
 
-Four injected faults, one per ISA-95 layer, detected ≤60s:
+Four injected faults:
 
-| Code | Layer | Fault | Alarm | Detection | Auto-clear |
-|------|-------|-------|-------|-----------|------------|
-| 1 | L1 Sensor | Temp sensor frozen | SENSOR_TEMP_STUCK (10) | ~3s, dual-mode | No |
-| 2 | L2 Equipment | Feed pump failure | PUMP_NO_FLOW (20) | ~3s | No |
-| 3 | L3 Process | Heater runaway | TEMP_OUT_OF_RANGE (30) | ~11s, target 98°C | **Yes** |
-| 4 | L4 Infrastructure | MQTT broker dead | DATA_STALE (40) | Instant | No |
+| Code | Layer | Fault | Alarm | Detection |
+|------|-------|-------|-------|-----------|
+| 1 | L1 Sensor | Temp sensor frozen | SENSOR_TEMP_STUCK (10) | ~3s |
+| 2 | L2 Equipment | Feed pump failure | PUMP_NO_FLOW (20) | ~3s |
+| 3 | L3 Process | Heater runaway | TEMP_OUT_OF_RANGE (30) | ~11s |
+| 4 | L4 Infrastructure | MQTT broker dead | DATA_STALE (40) | Instant |
 
-Process alarms (triggered by conditions, not injected):
+Process alarms:
 
-| Code | Alarm | Trigger | Auto-clear |
-|------|-------|---------|------------|
-| 50 | TANK_OVERFLOW | Level ≥90% (pump-active) | No |
-| 51 | TANK_EMPTY | Level ≤15% (pump-active) | No |
-| 52 | BUFFER_HIGH | Buffer ≥54/60 | No |
-| 53 | COOLER_HIGH | Cooler ≥32°C | **Yes** (<32°C) |
-
-**Priority:** DATA_STALE > TANK_OVERFLOW > TANK_EMPTY > BUFFER_HIGH > COOLER_HIGH > TEMP_OUT_OF_RANGE > PUMP_NO_FLOW > SENSOR_TEMP_STUCK. All use 3-tick debounce.
+| Code | Alarm | Trigger |
+|------|-------|---------|
+| 50 | TANK_OVERFLOW | Level ≥90% |
+| 51 | TANK_EMPTY | Level ≤15% |
+| 52 | BUFFER_HIGH | Buffer ≥54/60 |
+| 53 | COOLER_HIGH | Cooler ≥32°C |
 
 ---
 
@@ -331,39 +379,30 @@ Process alarms (triggered by conditions, not injected):
 
 ### Page 0 — SCHEMATIC
 
-- **SVG P&ID**: 7 animated equipment nodes with status glow, pump impeller spin, pipe flow dash, heat pulse, fill streams, belt bottle movement. Manual override "M" badges.
-- **Status banner**: Context-aware (WARMING UP / PRIMING PUMP / NORMAL / ALARM).
-- **Stage cards** (S1–S5) + **KPI cards** (6 metrics).
-- **Sidebar**: START / STOP / HARD RESET, per-actuator manual override (checkbox→slider from current AUTO value→smooth return), fault injection (select→INJECT→RESET), refresh rate.
+SVG P&ID with 7 animated equipment nodes, status banner, stage cards (S1–S5), KPI cards. Sidebar: START/STOP/HARD RESET, manual override, fault injection.
 
 ### Page 1 — TRENDS
 
-- **2×2 sensor grid**: Pasteur Temp (68/78°C band lines), Tank Level, Flow Rate, Bottles Capped. `vertical_spacing=0.20`, centered annotations.
-- **Actuator charts**: Heater Power (0–100%), Cooler Temp & Valve (dual y-axis). Chart titles as centered `<div>` above each Plotly figure.
-- **FREEZE/UNFREEZE** per section. IDLE rows filtered.
+2×2 sensor grid + actuator charts. FREEZE/UNFREEZE per section.
 
 ### Page 2 — ALARMS
 
-- **Status row** + inline sensor strip (colour-coded by safety).
-- **Auto-diagnosis**: active alarm → diagnosis label + confidence badge + recommendation. Cache keyed on alarm+sensor fingerprint.
-- **Force Analysis**: with alarm → fresh diagnosis; without → system health check.
-- **AI consultation** (outside auto-refresh fragment): 4 quick-action buttons (Diagnose Alarm / Analyze State / Recovery Steps / Risk Check), chat history, free-form input.
-- **Alarm event log** with type distribution. **API key input** with hot-swap and engine indicator.
+Status row, auto-diagnosis, Force Analysis, AI consultation chat, alarm event log, API key hot-swap.
 
 ---
 
 ## Cloud Monitoring Dashboard
 
-Deployed at **[tuma206mdi-beverage-line-cloud-dashboard.streamlit.app](https://tuma206mdi-beverage-line-cloud-dashboard.streamlit.app/)**.
+Deployed at **[tuma206-digital-twin-v5-twhnsbpxc5hnue2iubzra4.streamlit.app](https://tuma206-digital-twin-v5-twhnsbpxc5hnue2iubzra4.streamlit.app/)**.
 
 Read-only MQTT-fed page using `RemoteEngineProxy`. Shows:
 
-- **MQTT status bar**: live connection indicator (green/orange/red dot + seconds since last update), broker diagnostics when disconnected
-- **8 KPI cards** with SVG equipment icons: Pasteurizer (thermometer), Cooler (snowflake), Flow Rate (spinning impeller), Completed (bottle), Raw Tank (fill-level tank), Conveyor Buffer (belt + bottles), PLC State (status circle), Alarm Status (warning triangle)
-- **2 trend charts**: Tank Level (area chart + target/limit lines), Pasteurizer Temperature (line + safe band + setpoint)
-- **Recent alarms** list (last 5, red left-border cards)
+- **MQTT status bar**: live connection indicator, seconds since last update
+- **8 KPI cards** with SVG equipment icons: Pasteurizer, Cooler, Flow Rate, Completed, Raw Tank, Conveyor Buffer, PLC State, Alarm Status
+- **2 trend charts**: Tank Level + Pasteurizer Temperature
+- **Recent alarms** list (last 5)
 
-No START/STOP, no fault injection, no manual override — pure monitoring. Data arrives via MQTT from any running `local_backend.py`.
+No START/STOP, no fault injection, no manual override — pure monitoring.
 
 ---
 
@@ -400,8 +439,6 @@ dashboard/
   SCHEMATIC.py                  # Page 0 — P&ID + stage cards + KPIs
   pages/1_Trends.py             # Page 1 — sensor + actuator charts + freeze
   pages/2_Alarms.py             # Page 2 — diagnosis + chat + event log
-
-backend/api.py                  # FastAPI REST + WebSocket (optional)
 ```
 
 ---
@@ -415,20 +452,16 @@ All constants in `config.py`. Key values:
 | `UPDATE_PERIOD_S` | 1.0 s | Simulated time per tick |
 | `TANK_LEVEL_TARGET` | 55% | Inlet FF+P setpoint |
 | `TANK_LEVEL_LOW / HIGH` | 30% / 80% | Pump proportional band |
-| `TANK_CRITICAL_HIGH / LOW` | 90% / 15% | Overflow / empty alarm |
 | `PASTEUR_SETPOINT` | 72°C | Heater PI setpoint |
 | `PASTEUR_SAFE_MIN / MAX` | 68 / 78°C | Safe temperature band |
 | `COOLER_SETPOINT` | 25°C | Cooler PI setpoint |
-| `COOLER_FLOOR` | 15°C | Coldest at 100% valve |
 | `COOLER_MAX_BOTTLING` | 28°C | Fill interlock |
-| `COOLER_ALARM_HIGH` | 32°C | COOLER_HIGH alarm |
 | `FILL_NOZZLES` | 4 | Nozzles per carrier |
 | `FILL_VOLUME_ML` | 500 mL | Bottle volume |
 | `CONVEYOR_MAX_BOTTLES` | 60 | Buffer capacity |
 | `CONVEYOR_TARGET_BUFFER` | 12 | P-ctrl setpoint |
-| `CONVEYOR_BOTTLES_PER_TICK_AT_100` | 1.5 | Discharge at 100% belt |
 | `ALARM_DEBOUNCE_TICKS` | 3 | Ticks to latch alarm |
-| `MQTT_TOPIC_PREFIX` | tuma206grp1bvg | MQTT namespace |
+| `MQTT_TOPIC_PREFIX` | tuma206grp1bvg_escanes0723 | Unique MQTT namespace |
 
 ---
 
@@ -437,10 +470,10 @@ All constants in `config.py`. Key values:
 | Layer | Technology | Rationale |
 |-------|-----------|-----------|
 | Dashboard | Streamlit + Plotly + CSS/SVG | Live `@st.fragment` refresh, interactive charts, inline SVG P&ID |
-| Backend | Python (dataclasses, threading) | Single language; explicit I/O pins match RTL design |
-| Database | SQLite + CSV | Zero-config, reproducible, 1 Hz sufficient |
-| Messaging | paho-mqtt → HiveMQ Cloud (TLS 8883) | Standard IoT protocol; InProcessBus fallback |
-| AI | OpenAI / Anthropic (auto-detect) + rule-based | Dual provider; always-on fallback for offline use |
+| Backend | Python (dataclasses, threading) | Single language; explicit I/O pins |
+| Database | SQLite + CSV | Zero-config, reproducible |
+| Messaging | paho-mqtt → HiveMQ Cloud (TLS 8883) | Standard IoT protocol |
+| AI | OpenAI / Anthropic (auto-detect) + rule-based | Dual provider; offline fallback |
 | Notifications | Telegram Bot API | Background-thread push on alarm |
 
 ---
@@ -451,3 +484,5 @@ All constants in `config.py`. Key values:
 > Nie Zhaorui (03821814, ICD) · Zhao Xinglong (03822679, ICD) · Siew Xuan Hui (03822086, ICD)
 >
 > **Modern Developments in Industry · 2025/26 Semester 2** · Lecturer: Eldhose Abraham
+>
+> **Cloud deployment:** Escanes0723 · [GitHub Repo](https://github.com/Escanes0723/TUMA206-digital-twin-V5) · [Cloud Dashboard](https://tuma206-digital-twin-v5-twhnsbpxc5hnue2iubzra4.streamlit.app/)
