@@ -20,15 +20,17 @@ import streamlit as st
 import config
 from engine.remote import RemoteEngineProxy
 
-# ── Engine: fresh per restart, NOT shared via cache_resource ────────────
-# The cloud dashboard is a single page — no cross-page sharing needed.
-# @st.cache_resource is used only for the spinner; the instance is replaced
-# on each Streamlit restart, avoiding "cached failed connection forever".
-@st.cache_resource(show_spinner="Connecting to MQTT broker…")
-def _get_cloud_engine():
-    return RemoteEngineProxy(use_mqtt=True)
+# ── Page config MUST come first ─────────────────────────────────────────
+st.set_page_config(page_title="Beverage Line Monitor", layout="wide", page_icon="⏣")
 
-engine = _get_cloud_engine()
+# ── Engine: lazy init to avoid blocking page render ────────────────────
+_ENGINE = None
+
+def _get_engine():
+    global _ENGINE
+    if _ENGINE is None:
+        _ENGINE = RemoteEngineProxy(use_mqtt=True)
+    return _ENGINE
 
 # ── Theme ──────────────────────────────────────────────────────────────
 BG      = "#0d1117"
@@ -43,8 +45,6 @@ RED     = "#f85149"
 CYA     = "#39d2c0"
 STEEL   = "#2d333b"
 LIQUID  = "#3a7bd5"
-
-st.set_page_config(page_title="Beverage Line Monitor", layout="wide", page_icon="⏣")
 
 st.markdown(f"""
 <style>
@@ -216,7 +216,7 @@ display:flex;justify-content:space-between;align-items:center;">
 # LIVE VIEW
 # ═══════════════════════════════════════════════════════════════════════
 # ── MQTT diagnostics ───────────────────────────────────────────────────
-bus_kind = type(engine.bus).__name__
+bus_kind = type(_get_engine().bus).__name__
 if bus_kind == "MqttBus":
     mqtt_info = f"MQTT connected → {config.MQTT_HOST}:{config.MQTT_PORT}"
 else:
@@ -226,13 +226,14 @@ st.caption(mqtt_info)
 
 @st.fragment(run_every="2s")
 def monitor_view():
-    latest = engine.latest()
+    e = _get_engine()
+    latest = e.latest()
 
     # ── Data-freshness / MQTT status ──────────────────────────────────
     if not latest:
         st.error("No data received. Check: 1) local_backend.py is running  2) MQTT credentials match  3) topic prefix matches")
         with st.expander("Diagnostics"):
-            st.write(f"Bus type: {type(engine.bus).__name__}")
+            st.write(f"Bus type: {type(e.bus).__name__}")
             st.write(f"Broker: {config.MQTT_HOST}:{config.MQTT_PORT}")
             st.write(f"Topic: {config.MQTT_TOPIC_TAGS}")
             st.write(f"TLS: {config.MQTT_TLS}")
@@ -332,7 +333,7 @@ def monitor_view():
 
     # ── Trend Charts ───────────────────────────────────────────────────
     st.markdown('<div class="section-label">Process Trends</div>', unsafe_allow_html=True)
-    history = engine.historian.recent(window_s=300)
+    history = _get_engine().historian.recent(window_s=300)
     if history:
         df = pd.DataFrame(history)
         df["time"] = pd.to_datetime(df["ts"], unit="s")
@@ -388,7 +389,7 @@ def monitor_view():
 
     # ── Recent Alarms ──────────────────────────────────────────────────
     st.markdown('<div class="section-label">Recent Alarms</div>', unsafe_allow_html=True)
-    alarms = engine.historian.recent_alarms(20)
+    alarms = _get_engine().historian.recent_alarms(20)
     if alarms:
         adf = pd.DataFrame(alarms)
         adf["time"] = pd.to_datetime(adf["ts"], unit="s")
