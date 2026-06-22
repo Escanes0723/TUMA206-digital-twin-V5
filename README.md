@@ -6,41 +6,111 @@ A complete industrial digital twin of a beverage pasteurization and bottling lin
 
 ---
 
-## Quick Start
+## ⚠️ Important: How This System Works
 
-### Prerequisites
+> **The cloud URL is NOT a standalone website.** It is only a **display window** — like a TV screen. The actual data comes from YOUR computer running `local_backend.py`.
 
-- Python 3.12+
-- Git (optional)
+```
+别人打开 Cloud URL ──→ 能看到页面（深色 UI、KPI 卡片、趋势图）
+                         但显示 "No data" ❌
 
-### 1. Clone & Install
+只有当你电脑上跑着 local_backend.py ──→ 页面才有实时数据 ✅
+```
+
+**如果你关掉电脑或停止 `local_backend.py`，任何人都看不到数据 — 页面能打开，但一片空白。**
+
+---
+
+## 🖥️ Run On Your Own Computer
+
+### Step 1 — Download & Install
 
 ```bash
 git clone https://github.com/Escanes0723/TUMA206-digital-twin-V5.git
 cd TUMA206-digital-twin-V5
 python -m venv .venv
-.venv\Scripts\activate    # Windows
+.venv\Scripts\activate      # Windows
 pip install -r requirements.txt
 ```
 
-### 2. Launch
+### Step 2 — Start the Engine (REQUIRED)
 
-**Option A — One-click (Windows)**
-
-Double-click `START_ALL.bat` — opens local backend + dashboard + browser.
-
-**Option B — Manual**
+**This is the most important step.** Without this, there is no data — neither local nor cloud will show anything.
 
 ```bash
-# Terminal 1: Start the simulation engine
+# Terminal 1: Start the simulation engine + MQTT publisher
 python local_backend.py
-
-# Terminal 2: Start the local dashboard (in remote mode to share data with cloud)
-set DASHBOARD_MODE=remote
-streamlit run dashboard/app.py --server.port 8505
 ```
 
-Then open **http://localhost:8505** in your browser.
+You must see this output:
+```
+[MqttBus] connected to 3c57522d5f2e469d8ced051055a5bf1f.s1.eu.hivemq.cloud:8883
+Line auto-started — cloud dashboard will show live data.
+```
+
+### Step 3 — Open the Dashboard
+
+**Local dashboard** (full control: START/STOP, faults, manual override):
+
+```bash
+# Terminal 2: Start local dashboard
+streamlit run dashboard/app.py --server.port 8501
+```
+Open → **http://localhost:8501**
+
+**Or** use the one-click launcher: double-click `START_ALL.bat`.
+
+### Step 4 — (Optional) Check the Cloud Dashboard
+
+Once `local_backend.py` is running, open your cloud URL in any browser, from any device:
+
+→ **https://tuma206-digital-twin-v5-twhnsbpxc5hnue2iubzra4.streamlit.app/**
+
+It shows the same live data — but read-only (no control).
+
+---
+
+## ☁️ Deploy Your Own Cloud Dashboard
+
+If you want your OWN cloud URL (independent from Escanes0723's deployment):
+
+### 1. Fork & Customize
+
+```bash
+# Fork this repo on GitHub, then clone YOUR fork
+git clone https://github.com/YOUR_USERNAME/TUMA206-digital-twin-V5.git
+cd TUMA206-digital-twin-V5
+```
+
+**Change the MQTT topic prefix** to something unique in these two files:
+- `.env`: `MQTT_TOPIC_PREFIX=tuma206grp1bvg_YOUR_SUFFIX`
+- `cloud_app.py` line 5: `os.environ["MQTT_TOPIC_PREFIX"] = "tuma206grp1bvg_YOUR_SUFFIX"`
+
+### 2. Deploy to Streamlit Cloud
+
+1. Push to your GitHub
+2. Go to [share.streamlit.io](https://share.streamlit.io) → New app
+3. Select your repo, Main file = `cloud_app.py`
+4. Settings → Secrets, add:
+
+```toml
+MQTT_HOST = "3c57522d5f2e469d8ced051055a5bf1f.s1.eu.hivemq.cloud"
+MQTT_PORT = "8883"
+MQTT_TLS = "1"
+MQTT_USERNAME = "tumademo"
+MQTT_PASSWORD = "Tuma2026demo"
+```
+
+5. Settings → Sharing → **Public** (so anyone can open the URL without login)
+6. Save → Reboot → Done! Your cloud URL is live.
+
+### 3. Run your engine
+
+```bash
+python local_backend.py
+```
+
+Now **anyone** opening your cloud URL sees YOUR live data.
 
 ---
 
