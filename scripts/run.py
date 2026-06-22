@@ -10,8 +10,8 @@ Usage:
 
 from __future__ import annotations
 
-import argparse
-import time
+import argparse, os, sys, time
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config
 from ai_assistant import AIAssistant
